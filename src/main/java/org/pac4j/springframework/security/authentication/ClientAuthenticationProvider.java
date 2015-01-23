@@ -43,16 +43,16 @@ import org.springframework.security.core.userdetails.UserDetailsChecker;
  * @since 1.0.0
  */
 public final class ClientAuthenticationProvider implements AuthenticationProvider, InitializingBean {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(ClientAuthenticationProvider.class);
-    
+
     private Clients clients;
-    
+
     private AuthenticationUserDetailsService<ClientAuthenticationToken> userDetailsService =
             new CopyRolesUserDetailsService();
-    
+
     private UserDetailsChecker userDetailsChecker = new AccountStatusUserDetailsChecker();
-    
+
     @SuppressWarnings({
         "unchecked", "rawtypes"
     })
@@ -63,20 +63,21 @@ public final class ClientAuthenticationProvider implements AuthenticationProvide
             return null;
         }
         final ClientAuthenticationToken token = (ClientAuthenticationToken) authentication;
-        
+
         // get the credentials
         final Credentials credentials = (Credentials) authentication.getCredentials();
         logger.debug("credentials : {}", credentials);
-        
+
         // get the right client
         final String clientName = token.getClientName();
         final Client client = this.clients.findClient(clientName);
         // get the user profile
         final UserProfile userProfile = client.getUserProfile(credentials, null);
         logger.debug("userProfile : {}", userProfile);
-        
+
         // by default, no authorities
         Collection<? extends GrantedAuthority> authorities = new ArrayList<GrantedAuthority>();
+        UserDetails customUserDetails = null;
         // get user details and check them
         if (this.userDetailsService != null) {
             final ClientAuthenticationToken tmpToken = new ClientAuthenticationToken(credentials, clientName,
@@ -85,6 +86,7 @@ public final class ClientAuthenticationProvider implements AuthenticationProvide
             logger.debug("userDetails : {}", userDetails);
             if (userDetails != null) {
                 this.userDetailsChecker.check(userDetails);
+                customUserDetails = userDetails;
                 authorities = userDetails.getAuthorities();
                 logger.debug("authorities : {}", authorities);
             }
@@ -94,7 +96,11 @@ public final class ClientAuthenticationProvider implements AuthenticationProvide
         // authorities
         final ClientAuthenticationToken result = new ClientAuthenticationToken(credentials, clientName, userProfile,
                                                                                authorities);
-        result.setDetails(authentication.getDetails());
+        if(customUserDetails != null)
+            result.setDetails(customUserDetails);
+        else
+            result.setDetails(authentication.getDetails());
+
         logger.debug("result : {}", result);
         return result;
     }
